@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+if [[ $1 = "-h" ]]; then
+	echo "Keeps the Circles away."
+	echo "Running this script toggels Circle's filtering on/off."
+	echo
+	echo "Options:"
+	echo "-h			You already know what it does apparently."
+	echo "-s			Tells you which is active at present."
+	exit
+fi
+
+echo Getting your gateway IP...
+GATEWAY=`netstat -rn | grep -m 1 default | tr -s ' ' | cut -d ' ' -f 2`
+INTERFACE=`netstat -rn | grep -m 1 default | tr -s ' ' | cut -d ' ' -f 4`
+echo Success: $GATEWAY
+echo "Searching for Circles MAC address..."
+CMAC=`curl -s  http://meetcircle.local:4444/api/USERINFO | jq -r .info.circleID | awk '{print tolower($0)}'`
+echo Success: $CMAC
+
+isProtected () {
+	! arp -i en0 $GATEWAY | grep $CMAC > /dev/null
+}
+
+getRouterMACAddress () {
+	sudo arping -c 1 -i $INTERFACE $GATEWAY \
+	| grep -v $CMAC \
+	| grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}' \
+	| head -1
+}
+
+if [[ $1 = "-s" ]]; then	
+	isProtected && echo "Square is activate." || echo "Circle is activate."
+	exit
+fi
+
+if isProtected; then
+	echo "Activating Circle..."
+	sudo arp -S $GATEWAY $CMAC ifscope en0 > /dev/null
+else
+	echo "Activating Square..."
+	echo Querying the real MAC address of the gateway IP...
+	GMAC=`getRouterMACAddress`
+	echo Success: $GMAC
+	sudo arp -S $GATEWAY $GMAC ifscope en0 > /dev/null
+fi
+ 
+echo "Done."
