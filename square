@@ -2,11 +2,13 @@
 
 if [[ $1 = "-h" ]]; then
 	echo "Keeps the Circles away."
-	echo "Running this script toggels Circle's filtering on/off."
+	echo "Running this script allows you to bypass Circle's filtering"
+	echo "If you are already protected, then you will go back to normal."
 	echo
 	echo "Options:"
 	echo "-h			You already know what it does apparently."
-	echo "-s			Tells you which is active at present."
+	echo "-s			Tells you which is active right now."
+	echo "-m			Manual mode - allows you to set a manual MAC Address to the ARP Table."
 	exit
 fi
 
@@ -15,22 +17,37 @@ GATEWAY=`netstat -rn | grep -m 1 default | tr -s ' ' | cut -d ' ' -f 2`
 INTERFACE=`netstat -rn | grep -m 1 default | tr -s ' ' | cut -d ' ' -f 4`
 echo Success: $GATEWAY
 echo "Searching for Circles MAC address..."
-CMAC=`curl -s  http://meetcircle.local:4444/api/USERINFO | jq -r .info.circleID | awk '{print tolower($0)}'`
-echo Success: $CMAC
+fromWebsiteCMAC=`curl -s  http://meetcircle.local:4444/api/USERINFO | jq -r .info.circleID | awk '{print tolower($0)}'`
+CMAC=null # set this if the entry in the ARP table is slightly different compared to what's from above
+echo Success: $fromWebsiteCMAC
 
 isProtected () {
-	! arp -i en0 $GATEWAY | grep $CMAC > /dev/null
+	if [ CMAC == "null" ]; then
+		!arp -i en0 $GATEWAY | grep $fromWebsiteCMAC > /dev/null
+	else
+		!arp -i en0 $GATEWAY | grep $CMAC > /dev/null
+	fi
 }
 
 getRouterMACAddress () {
 	sudo arping -c 1 -i $INTERFACE $GATEWAY \
-	| grep -v $CMAC \
+	| grep -v $fromWebsiteCMAC \
 	| grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}' \
 	| head -1
 }
 
 if [[ $1 = "-s" ]]; then	
-	isProtected && echo "Square is activate." || echo "Circle is activate."
+	isProtected && echo "Square is active." || echo "Circle is active."
+	exit
+fi
+
+if [[ $1 = "-m" ]]; then
+	if [ $# -eq 2 ]; then
+		sudo arp -S $GATEWAY $2 ifscope en0 > /dev/null
+	else
+		echo "Please enter in a MAC Address after the -m argument."
+	fi
+	echo "Done."
 	exit
 fi
 
