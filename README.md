@@ -33,7 +33,7 @@ If you'd like to manually use a different MAC address to add to the arp table, r
 
 The Circle device uses a method called ARP Spoofing, which in short, means one device pretends to be another device.
 
-In this script, we try to add a static ARP Entry, which unless the root user deletes it, nevers change.
+In this script, we try to add a static ARP Entry, which unless the root user deletes it, never changes.
 
 ## More details about ARP Spoofing
 
